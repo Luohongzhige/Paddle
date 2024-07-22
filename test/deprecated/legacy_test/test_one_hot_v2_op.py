@@ -248,7 +248,7 @@ class BadInputTestOnehotV2(unittest.TestCase):
                     dtype="float32",
                 )
                 if not paddle.framework.use_pir_api():
-                    label.desc.set_need_check_feed(False)
+                    label.desc.need_check_feed(False)
                 one_hot_label = paddle.nn.functional.one_hot(
                     x=label, num_classes=4
                 )
