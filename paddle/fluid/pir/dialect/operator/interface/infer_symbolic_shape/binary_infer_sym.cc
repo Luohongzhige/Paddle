@@ -411,12 +411,11 @@ bool FillDiagonalTensor_OpInferSymbolicShape(
 //   return true;
 // }
 
-// bool GridSampleOpInferSymbolicShape(pir::Operation *op,
-//                                     pir::InferSymbolicShapeContext
-//                                     *infer_context) {
-//   // pass
-//   return true;
-// }
+bool GridSampleOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  // pass
+  return true;
+}
 
 bool GatherOpInferSymbolicShape(pir::Operation *op,
                                 pir::InferSymbolicShapeContext *infer_context) {

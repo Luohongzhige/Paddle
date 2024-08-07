@@ -911,11 +911,11 @@ bool GenerateProposalsV2OpInferSymbolicShape(
   return true;
 }
 
-// bool GruOpInferSymbolicShape(pir::Operation *op,
-//                              pir::InferSymbolicShapeContext *infer_context) {
-//   // pass
-//   return true;
-// }
+bool GruOpInferSymbolicShape(pir::Operation *op,
+                             pir::InferSymbolicShapeContext *infer_context) {
+  // pass
+  return true;
+}
 
 // bool GruUnitOpInferSymbolicShape(pir::Operation *op,
 //                                  pir::InferSymbolicShapeContext
