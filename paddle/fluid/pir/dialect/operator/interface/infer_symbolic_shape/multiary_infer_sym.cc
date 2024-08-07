@@ -888,12 +888,26 @@ bool FlashAttnOpInferSymbolicShape(
 //   return true;
 // }
 
-// bool GenerateProposalsOpInferSymbolicShape(pir::Operation *op,
-//                                            pir::InferSymbolicShapeContext
-//                                            *infer_context) {
-//   // pass
-//   return true;
-// }
+bool GenerateProposalsV2OpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  // 设置输出 rpn_rois 的形状
+  std::vector<symbol::DimExpr> rpn_rois_shape = {
+      symbol::DimExpr::CreateSymbolicDim(), symbol::DimExpr(4)};
+  infer_context->SetShapeOrDataForValue(
+      op->result(0),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs(rpn_rois_shape)});
+
+  // 设置输出 rpn_roi_probs 的形状
+  std::vector<symbol::DimExpr> rpn_roi_probs_shape = {
+      symbol::DimExpr::CreateSymbolicDim(), symbol::DimExpr(1)};
+  infer_context->SetShapeOrDataForValue(
+      op->result(1),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs(rpn_roi_probs_shape)});
+
+  return true;
+}
 
 // bool GruOpInferSymbolicShape(pir::Operation *op,
 //                              pir::InferSymbolicShapeContext *infer_context) {
