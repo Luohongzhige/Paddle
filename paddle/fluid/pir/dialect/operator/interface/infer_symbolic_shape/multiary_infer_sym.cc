@@ -1154,6 +1154,280 @@ bool FlashAttnOpInferSymbolicShape(
 //   return true;
 // }
 
+bool GraphKhopSamplerOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  // 获取输入张量的符号形状
+  const symbol::ShapeOrDataDimExprs &row_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(0));
+  const symbol::ShapeOrDataDimExprs &col_ptr_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(1));
+  const symbol::ShapeOrDataDimExprs &x_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(2));
+  const symbol::ShapeOrDataDimExprs &eids_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(3));
+
+  // 定义形状检查函数
+  auto GKSShapeCheck = [&](const symbol::ShapeOrDataDimExprs &shape,
+                           const std::string &tensor_name) {
+    if (shape.rank() == 2) {
+      PADDLE_ENFORCE_EQ(shape.shape()[1],
+                        symbol::DimExpr(1),
+                        common::errors::InvalidArgument(
+                            "The last dim of %s should be 1 when it "
+                            "is 2D, but we get %d",
+                            tensor_name,
+                            shape.shape()[1]));
+    } else {
+      PADDLE_ENFORCE_EQ(
+          shape.rank(),
+          1,
+          common::errors::InvalidArgument(
+              "The %s should be 1D, when it is not 2D, but we get %d",
+              tensor_name,
+              shape.rank()));
+    }
+  };
+
+  // 对输入张量进行形状检查
+  GKSShapeCheck(row_shape, "row");
+  GKSShapeCheck(col_ptr_shape, "col_ptr");
+  GKSShapeCheck(x_shape, "x");
+
+  // 检查sample_sizes是否为空
+  std::vector<int> sample_sizes =
+      paddle::dialect::details::GetVectorAttr<int>(op, "sample_sizes");
+  PADDLE_ENFORCE_EQ(
+      !sample_sizes.empty(),
+      true,
+      common::errors::InvalidArgument(
+          "The parameter 'sample_sizes' in GraphSampleOp must be set. "
+          "But received 'sample_sizes' is empty."));
+
+  // 根据 return_eids 设置输出 eids
+  bool return_eids = op->attribute<pir::BoolAttribute>("return_eids").data();
+  if (return_eids) {
+    GKSShapeCheck(eids_shape, "eids");
+    infer_context->SetShapeOrDataForValue(
+        op->result(5),
+        symbol::ShapeOrDataDimExprs{
+            symbol::TensorShapeOrDataDimExprs({symbol::DimExpr(-1)})});
+  }
+
+  // 设置其他输出张量的形状
+  infer_context->SetShapeOrDataForValue(
+      op->result(0),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs({symbol::DimExpr(-1), 1})});
+  infer_context->SetShapeOrDataForValue(
+      op->result(1),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs({symbol::DimExpr(-1), 1})});
+  infer_context->SetShapeOrDataForValue(
+      op->result(2),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs({symbol::DimExpr(-1)})});
+  infer_context->SetShapeOrDataForValue(
+      op->result(3), symbol::ShapeOrDataDimExprs{x_shape.shape()});
+
+  return true;
+}
+
+bool GraphSampleNeighborsOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  // Obtain symbolic shapes for input tensors
+  const symbol::ShapeOrDataDimExprs &row_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(0));
+  const symbol::ShapeOrDataDimExprs &col_ptr_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(1));
+  const symbol::ShapeOrDataDimExprs &x_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(2));
+  const symbol::ShapeOrDataDimExprs &eids_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(3));
+  const symbol::ShapeOrDataDimExprs &perm_buffer_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(4));
+
+  // Define shape check function
+  auto GSNShapeCheck = [&](const symbol::ShapeOrDataDimExprs &shape,
+                           const std::string &tensor_name) {
+    if (shape.rank() == 2) {
+      PADDLE_ENFORCE_EQ(shape.shape()[1],
+                        symbol::DimExpr(1),
+                        common::errors::InvalidArgument(
+                            "The last dim of %s should be 1 when it "
+                            "is 2D, but we get %d",
+                            tensor_name,
+                            shape.shape()[1]));
+    } else {
+      PADDLE_ENFORCE_EQ(
+          shape.rank(),
+          1,
+          common::errors::InvalidArgument(
+              "The %s should be 1D, when it is not 2D, but we get %d",
+              tensor_name,
+              shape.rank()));
+    }
+  };
+
+  // Perform shape checks
+  GSNShapeCheck(row_shape, "Row");
+  GSNShapeCheck(col_ptr_shape, "Col_Ptr");
+  GSNShapeCheck(x_shape, "X");
+
+  // Check for return_eids and flag_perm_buffer
+  bool return_eids = op->attribute<pir::BoolAttribute>("return_eids").data();
+  bool flag_perm_buffer =
+      op->attribute<pir::BoolAttribute>("flag_perm_buffer").data();
+
+  if (return_eids) {
+    GSNShapeCheck(eids_shape, "Eids");
+    infer_context->SetShapeOrDataForValue(
+        op->result(2),
+        symbol::ShapeOrDataDimExprs{
+            symbol::TensorShapeOrDataDimExprs({symbol::DimExpr(-1)})});
+  }
+
+  if (flag_perm_buffer) {
+    GSNShapeCheck(perm_buffer_shape, "Perm_Buffer");
+  }
+
+  // Set shapes for the outputs
+  infer_context->SetShapeOrDataForValue(
+      op->result(0),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs({symbol::DimExpr(-1)})});
+  infer_context->SetShapeOrDataForValue(
+      op->result(1),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs({symbol::DimExpr(-1)})});
+
+  return true;
+}
+
+bool MaskedMultiheadAttentionOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  // 获取输入 Tensor 的符号形状
+  const symbol::ShapeOrDataDimExprs &x_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(0));
+  const symbol::ShapeOrDataDimExprs &cache_kv_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(1));
+  const std::vector<symbol::DimExpr> &x_dims = x_shape.shape();
+  const std::vector<symbol::DimExpr> &cache_kv_dims = cache_kv_shape.shape();
+
+  // 获取属性
+  int seq_len = op->attribute<pir::Int32Attribute>("seq_len").data();
+  int rotary_emb_dims =
+      op->attribute<pir::Int32Attribute>("rotary_emb_dims").data();
+  bool use_neox_rotary_style =
+      op->attribute<pir::BoolAttribute>("use_neox_rotary_style").data();
+  std::string compute_dtype =
+      op->attribute<pir::StrAttribute>("compute_dtype").AsString();
+  float out_scale = op->attribute<pir::FloatAttribute>("out_scale").data();
+  int quant_round_type =
+      op->attribute<pir::Int32Attribute>("quant_round_type").data();
+  float quant_max_bound =
+      op->attribute<pir::FloatAttribute>("quant_max_bound").data();
+  float quant_min_bound =
+      op->attribute<pir::FloatAttribute>("quant_min_bound").data();
+
+  // 检查cache_kv的维度
+  PADDLE_ENFORCE_EQ(
+      cache_kv_dims.size(),
+      5,
+      phi::errors::InvalidArgument("The cache_kv must be 5 dims."));
+  PADDLE_ENFORCE_EQ(
+      cache_kv_dims[0],
+      symbol::DimExpr(2),
+      phi::errors::InvalidArgument("The first dim of cache_kv must be 2."));
+
+  // 计算输出维度
+  symbol::DimExpr bsz = x_dims[0];
+  symbol::DimExpr dim_head = cache_kv_dims[4];
+  int k_num_head = static_cast<int>(cache_kv_dims[2].AsInt());
+  int v_num_head = k_num_head;
+  int num_head =
+      (x_dims[x_dims.size() - 1] / dim_head - k_num_head - v_num_head).AsInt();
+  std::vector<symbol::DimExpr> out_dims = {bsz, num_head * dim_head};
+
+  // 设置输出张量的符号形状
+  infer_context->SetShapeOrDataForValue(op->result(0),
+                                        symbol::ShapeOrDataDimExprs{out_dims});
+
+  // 设置cache_kv_out的符号形状和类型
+  infer_context->SetShapeOrDataForValue(op->result(1), cache_kv_shape);
+
+  // 设置beam_cache_offset_out的符号形状和类型（如果存在）
+  if (op->result(2)) {
+    const symbol::ShapeOrDataDimExprs &beam_cache_offset_shape =
+        infer_context->GetShapeOrDataForValue(op->operand_source(8));
+    infer_context->SetShapeOrDataForValue(op->result(2),
+                                          beam_cache_offset_shape);
+  }
+
+  return true;
+}
+
+bool MaskedMultiheadAttentionOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  // 获取输入 Tensor 的符号形状
+  const symbol::ShapeOrDataDimExprs &x_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(0));
+  const symbol::ShapeOrDataDimExprs &cache_kv_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(1));
+  const std::vector<symbol::DimExpr> &x_dims = x_shape.shape();
+  const std::vector<symbol::DimExpr> &cache_kv_dims = cache_kv_shape.shape();
+
+  // 获取属性
+  int seq_len = op->attribute<pir::Int32Attribute>("seq_len").data();
+  int rotary_emb_dims =
+      op->attribute<pir::Int32Attribute>("rotary_emb_dims").data();
+  bool use_neox_rotary_style =
+      op->attribute<pir::BoolAttribute>("use_neox_rotary_style").data();
+  std::string compute_dtype =
+      op->attribute<pir::StrAttribute>("compute_dtype").AsString();
+  float out_scale = op->attribute<pir::FloatAttribute>("out_scale").data();
+  int quant_round_type =
+      op->attribute<pir::Int32Attribute>("quant_round_type").data();
+  float quant_max_bound =
+      op->attribute<pir::FloatAttribute>("quant_max_bound").data();
+  float quant_min_bound =
+      op->attribute<pir::FloatAttribute>("quant_min_bound").data();
+
+  // 检查cache_kv的维度
+  PADDLE_ENFORCE_EQ(
+      cache_kv_dims.size(),
+      5,
+      phi::errors::InvalidArgument("The cache_kv must be 5 dims."));
+  PADDLE_ENFORCE_EQ(
+      cache_kv_dims[0],
+      symbol::DimExpr(2),
+      phi::errors::InvalidArgument("The first dim of cache_kv must be 2."));
+
+  // 计算输出维度
+  symbol::DimExpr bsz = x_dims[0];
+  symbol::DimExpr dim_head = cache_kv_dims[4];
+  int k_num_head = static_cast<int>(cache_kv_dims[2].AsInt());
+  int v_num_head = k_num_head;
+  int num_head =
+      (x_dims[x_dims.size() - 1] / dim_head - k_num_head - v_num_head).AsInt();
+  std::vector<symbol::DimExpr> out_dims = {bsz, num_head * dim_head};
+
+  // 设置输出张量的符号形状
+  infer_context->SetShapeOrDataForValue(op->result(0),
+                                        symbol::ShapeOrDataDimExprs{out_dims});
+
+  // 设置cache_kv_out的符号形状和类型
+  infer_context->SetShapeOrDataForValue(op->result(1), cache_kv_shape);
+
+  // 设置beam_cache_offset_out的符号形状和类型（如果存在）
+  if (op->result(2)) {
+    const symbol::ShapeOrDataDimExprs &beam_cache_offset_shape =
+        infer_context->GetShapeOrDataForValue(op->operand_source(8));
+    infer_context->SetShapeOrDataForValue(op->result(2),
+                                          beam_cache_offset_shape);
+  }
+
+  return true;
+}
 // bool GruOpInferSymbolicShape(pir::Operation *op,
 //                              pir::InferSymbolicShapeContext *infer_context)
 //                              {

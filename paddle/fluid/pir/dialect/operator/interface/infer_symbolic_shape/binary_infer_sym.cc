@@ -473,6 +473,24 @@ bool FillDiagonalTensor_OpInferSymbolicShape(
 //   return true;
 // }
 
+bool GatherTreeOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  const symbol::ShapeOrDataDimExprs &ids_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(0));
+  const symbol::ShapeOrDataDimExprs &parents_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(1));
+
+  PADDLE_ENFORCE_EQ(ids_shape.shape() == parents_shape.shape(),
+                    true,
+                    common::errors::InvalidArgument(
+                        "The shape of Input(Parents) must be same with the "
+                        "shape of Input(Ids)."));
+
+  infer_context->SetShapeOrDataForValue(op->result(0), ids_shape);
+
+  return true;
+}
+
 bool GatherOpInferSymbolicShape(pir::Operation *op,
                                 pir::InferSymbolicShapeContext *infer_context) {
   const auto &input_shape_or_data =
