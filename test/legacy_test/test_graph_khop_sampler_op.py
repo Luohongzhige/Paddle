@@ -16,9 +16,13 @@
 import numpy as np
 from op_test import OpTest
 
+import paddle
+
 
 class TestGraphKhopSamplerOp(OpTest):
     def setUp(self):
+        self.op_type = "graph_khop_sampler"
+        self.python_api = paddle.incubate.graph_khop_sampler
         num_nodes = 20
         edges = np.random.randint(num_nodes, size=(100, 2))
         edges = np.unique(edges, axis=0)
