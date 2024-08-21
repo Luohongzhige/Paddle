@@ -1169,7 +1169,7 @@ bool GraphKhopSamplerOpInferSymbolicShape(
   // 定义形状检查函数
   auto GKSShapeCheck = [&](const symbol::ShapeOrDataDimExprs &shape,
                            const std::string &tensor_name) {
-    if (shape.rank() == 2) {
+    if (shape.shape().size() == 2) {
       PADDLE_ENFORCE_EQ(shape.shape()[1],
                         symbol::DimExpr(1),
                         common::errors::InvalidArgument(
@@ -1179,12 +1179,12 @@ bool GraphKhopSamplerOpInferSymbolicShape(
                             shape.shape()[1]));
     } else {
       PADDLE_ENFORCE_EQ(
-          shape.rank(),
+          shape.shape().size(),
           1,
           common::errors::InvalidArgument(
               "The %s should be 1D, when it is not 2D, but we get %d",
               tensor_name,
-              shape.rank()));
+              shape.shape().size()));
     }
   };
 
@@ -1207,27 +1207,31 @@ bool GraphKhopSamplerOpInferSymbolicShape(
   bool return_eids = op->attribute<pir::BoolAttribute>("return_eids").data();
   if (return_eids) {
     GKSShapeCheck(eids_shape, "eids");
+    symbol::DimExpr out_unknown_4 = infer_context->GetNextSymName();
     infer_context->SetShapeOrDataForValue(
-        op->result(5),
+        op->result(4),
         symbol::ShapeOrDataDimExprs{
-            symbol::TensorShapeOrDataDimExprs({symbol::DimExpr(-1)})});
+            symbol::TensorShapeOrDataDimExprs({out_unknown_4})});
   }
 
   // 设置其他输出张量的形状
+  symbol::DimExpr out_unknown_0 = infer_context->GetNextSymName();
+  symbol::DimExpr out_unknown_1 = infer_context->GetNextSymName();
+  symbol::DimExpr out_unknown_2 = infer_context->GetNextSymName();
   infer_context->SetShapeOrDataForValue(
       op->result(0),
       symbol::ShapeOrDataDimExprs{
-          symbol::TensorShapeOrDataDimExprs({symbol::DimExpr(-1), 1})});
+          symbol::TensorShapeOrDataDimExprs({out_unknown_0, 1})});
   infer_context->SetShapeOrDataForValue(
       op->result(1),
       symbol::ShapeOrDataDimExprs{
-          symbol::TensorShapeOrDataDimExprs({symbol::DimExpr(-1), 1})});
+          symbol::TensorShapeOrDataDimExprs({out_unknown_1, 1})});
   infer_context->SetShapeOrDataForValue(
       op->result(2),
       symbol::ShapeOrDataDimExprs{
-          symbol::TensorShapeOrDataDimExprs({symbol::DimExpr(-1)})});
+          symbol::TensorShapeOrDataDimExprs({out_unknown_2})});
   infer_context->SetShapeOrDataForValue(
-      op->result(3), symbol::ShapeOrDataDimExprs{x_shape.shape()});
+      op->result(3), symbol::TensorShapeOrDataDimExprs{x_shape.shape()});
 
   return true;
 }
